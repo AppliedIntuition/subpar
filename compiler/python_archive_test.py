@@ -14,6 +14,7 @@
 
 import os
 import subprocess
+import sys
 import time
 import unittest
 import zipfile
@@ -45,11 +46,12 @@ class PythonArchiveTest(unittest.TestCase):
         if not os.path.exists(self.output_dir):
             os.makedirs(self.output_dir)
         self.output_filename = os.path.join(self.output_dir, 'output.par')
-        self.interpreter = '/usr/bin/python2'
+        self.interpreter = sys.executable
         self.import_roots = []
         self.date_time_tuple = (1980, 1, 1, 0, 0, 0)
         self.timestamp = 315532800
         self.zip_safe = True
+        self.no_remove = False
 
     def _construct(self, manifest_filename=None):
         return python_archive.PythonArchive(
@@ -61,6 +63,7 @@ class PythonArchiveTest(unittest.TestCase):
             output_filename=self.output_filename,
             timestamp=self.timestamp,
             zip_safe=self.zip_safe,
+            no_remove=self.no_remove,
         )
 
     def test_create_manifest_not_found(self):

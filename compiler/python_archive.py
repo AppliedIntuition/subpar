@@ -29,6 +29,8 @@ See also https://www.python.org/dev/peps/pep-0441/
 """
 
 from datetime import datetime
+import contextlib
+import errno
 import io
 import logging
 import os
@@ -46,7 +48,8 @@ from subpar.compiler import stored_resource
 _boilerplate_template = """\
 # Boilerplate added by subpar/compiler/python_archive.py
 from %(runtime_package)s import support as _
-_.setup(import_roots=%(import_roots)s, zip_safe=%(zip_safe)s)
+_.setup(import_roots=%(import_roots)s, zip_safe=%(zip_safe)s,
+    no_remove=%(no_remove)s)
 del _
 # End boilerplate
 """
@@ -100,6 +103,7 @@ class PythonArchive(object):
                  output_filename,
                  timestamp,
                  zip_safe,
+                 no_remove,
                  ):
         self.main_filename = main_filename
 
@@ -112,6 +116,7 @@ class PythonArchive(object):
         t = datetime.utcfromtimestamp(timestamp)
         self.timestamp_tuple = t.timetuple()[0:6]
         self.zip_safe = zip_safe
+        self.no_remove = no_remove
 
         self.compression = zipfile.ZIP_DEFLATED
 
@@ -170,6 +175,7 @@ class PythonArchive(object):
             'runtime_package': _runtime_package,
             'import_roots': str(import_roots),
             'zip_safe': self.zip_safe,
+            'no_remove': self.no_remove,
         }
         return boilerplate_contents.encode('ascii').decode('ascii')
 
@@ -274,7 +280,7 @@ class PythonArchive(object):
         """
 
         logging.debug('Storing Files...')
-        with zipfile.ZipFile(temp_parfile, 'w', self.compression) as z:
+        with contextlib.closing(zipfile.ZipFile(temp_parfile, 'w', self.compression)) as z:
             items = sorted(stored_resources.items())
             for relative_path, resource in items:
                 assert resource.zipinfo.filename == relative_path
@@ -289,9 +295,14 @@ class PythonArchive(object):
 
 
 def remove_if_present(filename):
-    """Delete any existing file"""
-    if os.path.exists(filename):
+    """Delete a file if it exists"""
+    try:
+        # Remove atomically
         os.remove(filename)
+    except OSError as exc:
+        # Ignore failure if file does not exist
+        if exc.errno != errno.ENOENT:
+            raise
 
 
 def fetch_support_file(name, timestamp_tuple):
